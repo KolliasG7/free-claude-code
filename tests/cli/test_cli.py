@@ -160,6 +160,7 @@ class TestCLISession:
         )
         assert session.workspace == os.path.normpath(os.path.abspath("/tmp/test"))
         assert session.api_url == "http://localhost:8082/v1"
+        assert session.skip_permissions is True
         assert not session.is_busy
 
     def test_session_extract_session_id(self):
@@ -225,6 +226,7 @@ class TestCLISession:
             assert args[0] == "claude"
             assert "-p" in args
             assert "Hello" in args
+            assert "--dangerously-skip-permissions" in args
 
             # Verify events
             assert (
@@ -291,6 +293,29 @@ class TestCLISession:
             assert "--resume" in args
             assert "sess_abc" in args
             assert "--fork-session" in args
+
+    @pytest.mark.asyncio
+    async def test_start_task_default_permission_mode(self):
+        """Default permission mode does not pass the skip-permissions flag."""
+        from cli.session import CLISession
+
+        session = CLISession("/tmp", "http://localhost:8082/v1", skip_permissions=False)
+
+        mock_process = AsyncMock()
+        mock_process.stdout.read.side_effect = [b""]
+        mock_process.stderr.read.return_value = b""
+        mock_process.wait.return_value = 0
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_exec:
+            mock_exec.return_value = mock_process
+
+            async for _ in session.start_task("Hello"):
+                pass
+
+        args = mock_exec.call_args[0]
+        assert "--dangerously-skip-permissions" not in args
 
     @pytest.mark.asyncio
     async def test_start_task_process_failure_with_stderr(self):

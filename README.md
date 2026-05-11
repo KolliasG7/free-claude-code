@@ -7,7 +7,7 @@ Use Claude Code CLI, VS Code, JetBrains ACP, or chat bots through your own Anthr
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=for-the-badge)](https://github.com/astral-sh/uv)
-[![Tested with Pytest](https://img.shields.io/badge/testing-Pytest-00c0ff.svg?style=for-the-badge)](https://github.com/Alishahryar1/free-claude-code/actions/workflows/tests.yml)
+[![Tested with Pytest](https://img.shields.io/badge/testing-Pytest-00c0ff.svg?style=for-the-badge)](https://github.com/KolliasG7/free-claude-code/actions/workflows/tests.yml)
 [![Type checking: Ty](https://img.shields.io/badge/type%20checking-ty-ffcc00.svg?style=for-the-badge)](https://pypi.org/project/ty/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20formatting-ruff-f5a623.svg?style=for-the-badge)](https://github.com/astral-sh/ruff)
 [![Logging: Loguru](https://img.shields.io/badge/logging-loguru-4ecdc4.svg?style=for-the-badge)](https://github.com/Delgan/loguru)
@@ -28,14 +28,14 @@ Free Claude Code routes Anthropic Messages API traffic from Claude Code to NVIDI
 - Six provider backends: NVIDIA NIM, OpenRouter, DeepSeek, LM Studio, llama.cpp, and Ollama.
 - Per-model routing: send Opus, Sonnet, Haiku, and fallback traffic to different providers.
 - Streaming, tool use, reasoning/thinking block handling, and local request optimizations.
-- Optional Discord or Telegram bot wrapper for remote coding sessions.
+- Optional Discord, Telegram, or webhook bot wrapper for remote coding sessions.
 - Optional voice-note transcription through local Whisper or NVIDIA NIM.
 
 ## Quick Start
 
 ### 1. Install Requirements
 
-Install [Claude Code](https://github.com/anthropics/claude-code), then install `uv` and Python 3.14.
+Install [Claude Code](https://github.com/anthropics/claude-code), then install `uv` and Python 3.14. Use a final CPython 3.14 release; old 3.14 alpha builds are not supported.
 
 macOS/Linux:
 
@@ -56,7 +56,7 @@ uv python install 3.14
 ### 2. Clone And Configure
 
 ```bash
-git clone https://github.com/Alishahryar1/free-claude-code.git
+git clone https://github.com/KolliasG7/free-claude-code.git
 cd free-claude-code
 cp .env.example .env
 ```
@@ -86,7 +86,7 @@ uv run uvicorn server:app --host 0.0.0.0 --port 8082
 Package install alternative:
 
 ```bash
-uv tool install git+https://github.com/Alishahryar1/free-claude-code.git
+uv tool install git+https://github.com/KolliasG7/free-claude-code.git
 fcc-init
 free-claude-code
 ```
@@ -284,7 +284,8 @@ Restart the IDE after changing the file.
 
 ### Model Picker
 
-`claude-pick` lets you choose a model at launch time.
+`claude-pick` lets you choose a model at launch time. It reads `.env` by default,
+or `CLAUDE_PICK_ENV_FILE`, `CLAUDE_PICK_PROVIDER`, and `CLAUDE_PICK_PORT` when set.
 
 ```bash
 brew install fzf
@@ -300,7 +301,7 @@ alias claude-kimi='ANTHROPIC_BASE_URL="http://localhost:8082" ANTHROPIC_AUTH_TOK
 
 ## Optional Integrations
 
-### Discord And Telegram Bots
+### Discord, Telegram, And Webhook Bots
 
 The bot wrapper runs Claude Code sessions remotely, streams progress, supports reply-based conversation branches, and can stop or clear tasks.
 
@@ -312,6 +313,7 @@ DISCORD_BOT_TOKEN="your-discord-bot-token"
 ALLOWED_DISCORD_CHANNELS="123456789"
 CLAUDE_WORKSPACE="./agent_workspace"
 ALLOWED_DIR="C:/Users/yourname/projects"
+CLAUDE_CLI_PERMISSION_MODE="skip"
 ```
 
 Create the bot in the [Discord Developer Portal](https://discord.com/developers/applications), enable Message Content Intent, and invite it with read/send/history permissions.
@@ -324,9 +326,28 @@ TELEGRAM_BOT_TOKEN="123456789:ABC..."
 ALLOWED_TELEGRAM_USER_ID="your-user-id"
 CLAUDE_WORKSPACE="./agent_workspace"
 ALLOWED_DIR="C:/Users/yourname/projects"
+CLAUDE_CLI_PERMISSION_MODE="skip"
 ```
 
 Get a token from [@BotFather](https://t.me/BotFather) and your user ID from [@userinfobot](https://t.me/userinfobot).
+
+Webhook minimum config:
+
+```dotenv
+MESSAGING_PLATFORM="webhook"
+WEBHOOK_SHARED_SECRET="choose-a-secret"
+WEBHOOK_OUTBOUND_URL="https://example.com/free-claude-code/events"
+CLAUDE_WORKSPACE="./agent_workspace"
+ALLOWED_DIR="C:/Users/yourname/projects"
+CLAUDE_CLI_PERMISSION_MODE="skip"
+```
+
+Post inbound messages to `/webhook/message` as JSON with `X-Webhook-Secret`.
+Outbound status updates are delivered to `WEBHOOK_OUTBOUND_URL`.
+
+`CLAUDE_CLI_PERMISSION_MODE="skip"` keeps bot sessions non-interactive by passing
+Claude Code's `--dangerously-skip-permissions`. Use `"default"` when a human can
+approve file and shell access interactively.
 
 Useful commands:
 
@@ -395,8 +416,8 @@ LLAMACPP_PROXY=""
 ### Rate Limits And Timeouts
 
 ```dotenv
-PROVIDER_RATE_LIMIT=1
-PROVIDER_RATE_WINDOW=3
+PROVIDER_RATE_LIMIT=40
+PROVIDER_RATE_WINDOW=60
 PROVIDER_MAX_CONCURRENCY=5
 HTTP_READ_TIMEOUT=120
 HTTP_WRITE_TIMEOUT=10
@@ -422,7 +443,7 @@ Raw logging flags can expose prompts, tool arguments, paths, and model output. K
 ### Local Web Tools
 
 ```dotenv
-ENABLE_WEB_SERVER_TOOLS=true
+ENABLE_WEB_SERVER_TOOLS=false
 WEB_FETCH_ALLOWED_SCHEMES=http,https
 WEB_FETCH_ALLOW_PRIVATE_NETWORKS=false
 ```
@@ -528,7 +549,7 @@ Run them in that order before pushing. CI enforces the same checks.
 
 ## Contributing
 
-- Report bugs and feature requests in [Issues](https://github.com/Alishahryar1/free-claude-code/issues).
+- Report bugs and feature requests in [Issues](https://github.com/KolliasG7/free-claude-code/issues).
 - Keep changes small and covered by focused tests.
 - Do not open Docker integration PRs.
 - Do not open README change PRs just open an issue for it.

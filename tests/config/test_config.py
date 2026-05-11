@@ -42,6 +42,7 @@ class TestSettings:
         assert settings.log_raw_sse_events is False
         assert settings.debug_platform_edits is False
         assert settings.debug_subagent_stack is False
+        assert settings.claude_cli_permission_mode == "default"
 
     def test_get_settings_cached(self):
         """Test get_settings returns cached instance."""
@@ -438,6 +439,31 @@ class TestSettingsOptionalStr:
         monkeypatch.setenv("MESSAGING_PLATFORM", "discord")
         s = Settings()
         assert s.messaging_platform == "discord"
+
+    def test_webhook_config_from_env(self, monkeypatch):
+        from config.settings import Settings
+
+        monkeypatch.setenv("MESSAGING_PLATFORM", "webhook")
+        monkeypatch.setenv("WEBHOOK_SHARED_SECRET", "secret")
+        monkeypatch.setenv("WEBHOOK_OUTBOUND_URL", "https://example.test/events")
+        s = Settings()
+        assert s.messaging_platform == "webhook"
+        assert s.webhook_shared_secret == "secret"
+        assert s.webhook_outbound_url == "https://example.test/events"
+
+    def test_claude_cli_permission_mode_from_env(self, monkeypatch):
+        from config.settings import Settings
+
+        monkeypatch.setenv("CLAUDE_CLI_PERMISSION_MODE", "skip")
+        s = Settings()
+        assert s.claude_cli_permission_mode == "skip"
+
+    def test_claude_cli_permission_mode_rejects_invalid(self, monkeypatch):
+        from config.settings import Settings
+
+        monkeypatch.setenv("CLAUDE_CLI_PERMISSION_MODE", "dangerous")
+        with pytest.raises(ValidationError, match="claude_cli_permission_mode"):
+            Settings()
 
     def test_whisper_device_auto_rejected(self, monkeypatch):
         """WHISPER_DEVICE=auto raises ValidationError (auto removed)."""

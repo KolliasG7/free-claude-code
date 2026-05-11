@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     deepseek_api_key: str = Field(default="", validation_alias="DEEPSEEK_API_KEY")
 
     # ==================== Messaging Platform Selection ====================
-    # Valid: "telegram" | "discord" | "none"
+    # Valid: "telegram" | "discord" | "webhook" | "none"
     messaging_platform: str = Field(
         default="discord", validation_alias="MESSAGING_PLATFORM"
     )
@@ -265,9 +265,18 @@ class Settings(BaseSettings):
     allowed_discord_channels: str | None = Field(
         default=None, validation_alias="ALLOWED_DISCORD_CHANNELS"
     )
+    webhook_shared_secret: str | None = Field(
+        default=None, validation_alias="WEBHOOK_SHARED_SECRET"
+    )
+    webhook_outbound_url: str | None = Field(
+        default=None, validation_alias="WEBHOOK_OUTBOUND_URL"
+    )
     claude_workspace: str = "./agent_workspace"
     allowed_dir: str = ""
     claude_cli_bin: str = Field(default="claude", validation_alias="CLAUDE_CLI_BIN")
+    claude_cli_permission_mode: str = Field(
+        default="default", validation_alias="CLAUDE_CLI_PERMISSION_MODE"
+    )
     max_message_log_entries_per_chat: int | None = Field(
         default=None, validation_alias="MAX_MESSAGE_LOG_ENTRIES_PER_CHAT"
     )
@@ -296,6 +305,8 @@ class Settings(BaseSettings):
         "allowed_telegram_user_id",
         "discord_bot_token",
         "allowed_discord_channels",
+        "webhook_shared_secret",
+        "webhook_outbound_url",
         "model_opus",
         "model_sonnet",
         "model_haiku",
@@ -329,9 +340,18 @@ class Settings(BaseSettings):
     @field_validator("messaging_platform")
     @classmethod
     def validate_messaging_platform(cls, v: str) -> str:
-        if v not in ("telegram", "discord", "none"):
+        if v not in ("telegram", "discord", "webhook", "none"):
             raise ValueError(
-                f"messaging_platform must be 'telegram', 'discord', or 'none', got {v!r}"
+                f"messaging_platform must be 'telegram', 'discord', 'webhook', or 'none', got {v!r}"
+            )
+        return v
+
+    @field_validator("claude_cli_permission_mode")
+    @classmethod
+    def validate_claude_cli_permission_mode(cls, v: str) -> str:
+        if v not in ("skip", "default"):
+            raise ValueError(
+                f"claude_cli_permission_mode must be 'skip' or 'default', got {v!r}"
             )
         return v
 

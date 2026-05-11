@@ -23,6 +23,8 @@ class MessagingPlatformOptions:
     allowed_telegram_user_id: str | None = None
     discord_bot_token: str | None = None
     allowed_discord_channels: str | None = None
+    webhook_shared_secret: str | None = None
+    webhook_outbound_url: str | None = None
     voice_note_enabled: bool = True
     whisper_model: str = "base"
     whisper_device: str = "cpu"
@@ -96,8 +98,18 @@ def create_messaging_platform(
             log_api_error_tracebacks=opts.log_api_error_tracebacks,
         )
 
+    if platform_type == "webhook":
+        from .webhook import WebhookPlatform
+
+        return WebhookPlatform(
+            shared_secret=opts.webhook_shared_secret,
+            outbound_url=opts.webhook_outbound_url,
+            messaging_rate_limit=opts.messaging_rate_limit,
+            messaging_rate_window=opts.messaging_rate_window,
+        )
+
     logger.warning(
         f"Unknown messaging platform: '{platform_type}'. "
-        "Supported: 'none', 'telegram', 'discord'"
+        "Supported: 'none', 'telegram', 'discord', 'webhook'"
     )
     return None

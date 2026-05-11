@@ -1,5 +1,7 @@
 """FastAPI route handlers."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from loguru import logger
 
@@ -7,51 +9,13 @@ from config.settings import Settings
 from core.anthropic import get_token_count
 
 from . import dependencies
+from .claude_models import SUPPORTED_CLAUDE_MODELS
 from .dependencies import get_settings, require_api_key
 from .models.anthropic import MessagesRequest, TokenCountRequest
-from .models.responses import ModelResponse, ModelsListResponse
+from .models.responses import ModelsListResponse
 from .services import ClaudeProxyService
 
 router = APIRouter()
-
-
-SUPPORTED_CLAUDE_MODELS = [
-    ModelResponse(
-        id="claude-opus-4-20250514",
-        display_name="Claude Opus 4",
-        created_at="2025-05-14T00:00:00Z",
-    ),
-    ModelResponse(
-        id="claude-sonnet-4-20250514",
-        display_name="Claude Sonnet 4",
-        created_at="2025-05-14T00:00:00Z",
-    ),
-    ModelResponse(
-        id="claude-haiku-4-20250514",
-        display_name="Claude Haiku 4",
-        created_at="2025-05-14T00:00:00Z",
-    ),
-    ModelResponse(
-        id="claude-3-opus-20240229",
-        display_name="Claude 3 Opus",
-        created_at="2024-02-29T00:00:00Z",
-    ),
-    ModelResponse(
-        id="claude-3-5-sonnet-20241022",
-        display_name="Claude 3.5 Sonnet",
-        created_at="2024-10-22T00:00:00Z",
-    ),
-    ModelResponse(
-        id="claude-3-haiku-20240307",
-        display_name="Claude 3 Haiku",
-        created_at="2024-03-07T00:00:00Z",
-    ),
-    ModelResponse(
-        id="claude-3-5-haiku-20241022",
-        display_name="Claude 3.5 Haiku",
-        created_at="2024-10-22T00:00:00Z",
-    ),
-]
 
 
 def get_proxy_service(
@@ -165,3 +129,18 @@ async def stop_cli(request: Request, _auth=Depends(require_api_key)):
     count = await handler.stop_all_tasks()
     logger.info("STOP_CLI: source=handler cancelled_count={}", count)
     return {"status": "stopped", "cancelled_count": count}
+
+
+@router.post("/webhook/message")
+async def webhook_message(request: Request, payload: dict[str, Any]):
+    """Accept inbound messages for the webhook messaging platform."""
+    platform = getattr(request.app.state, "messaging_platform", None)
+    if platform is None or getattr(platform, "name", None) != "webhook":
+        raise HTTPException(status_code=404, detail="Webhook platform is not enabled")
+
+    shared_secret = getattr(platform, "shared_secret", None)
+    if shared_secret and request.headers.get("x-webhook-secret") != shared_secret:
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
+
+    message_id = await platform.handle_inbound(payload)
+    return {"accepted": True, "message_id": message_id}

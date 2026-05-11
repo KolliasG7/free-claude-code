@@ -122,3 +122,23 @@ class TestCreateMessagingPlatform:
             "slack", MessagingPlatformOptions(telegram_bot_token="token")
         )
         assert result is None
+
+    def test_webhook_platform(self):
+        """Create webhook platform with optional shared secret and outbound URL."""
+        result = create_messaging_platform(
+            "webhook",
+            MessagingPlatformOptions(
+                webhook_shared_secret="secret",
+                webhook_outbound_url="https://example.test/events",
+                messaging_rate_limit=2,
+                messaging_rate_window=3.0,
+            ),
+        )
+
+        assert result is not None
+        assert result.name == "webhook"
+        from messaging.platforms.webhook import WebhookPlatform
+
+        assert isinstance(result, WebhookPlatform)
+        assert result.shared_secret == "secret"
+        assert result.outbound_url == "https://example.test/events"

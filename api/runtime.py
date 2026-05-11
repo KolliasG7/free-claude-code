@@ -138,6 +138,8 @@ class AppRuntime:
                     allowed_telegram_user_id=self.settings.allowed_telegram_user_id,
                     discord_bot_token=self.settings.discord_bot_token,
                     allowed_discord_channels=self.settings.allowed_discord_channels,
+                    webhook_shared_secret=self.settings.webhook_shared_secret,
+                    webhook_outbound_url=self.settings.webhook_outbound_url,
                     voice_note_enabled=self.settings.voice_note_enabled,
                     whisper_model=self.settings.whisper_model,
                     whisper_device=self.settings.whisper_device,
@@ -194,12 +196,14 @@ class AppRuntime:
             os.path.join(self.settings.claude_workspace, "plans")
         )
         plans_directory = os.path.relpath(plans_dir_abs, workspace)
+        skip_permissions = self.settings.claude_cli_permission_mode == "skip"
         self.cli_manager = CLISessionManager(
             workspace_path=workspace,
             api_url=api_url,
             allowed_dirs=allowed_dirs,
             plans_directory=plans_directory,
             claude_bin=self.settings.claude_cli_bin,
+            skip_permissions=skip_permissions,
             log_raw_cli_diagnostics=self.settings.log_raw_cli_diagnostics,
             log_messaging_error_details=self.settings.log_messaging_error_details,
         )
