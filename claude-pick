@@ -12,6 +12,9 @@ BASE_URL="http://localhost:$PORT"
 OPENROUTER_MODELS_URL="https://openrouter.ai/api/v1/models"
 DEFAULT_LM_STUDIO_BASE_URL="http://localhost:1234/v1"
 DEFAULT_LLAMACPP_BASE_URL="http://localhost:8080/v1"
+DEFAULT_OLLAMA_BASE_URL="http://localhost:11434"
+DEEPSEEK_MODELS="deepseek-chat
+deepseek-reasoner"
 
 if ! command -v uv >/dev/null 2>&1; then
     echo "Error: uv is required." >&2
@@ -43,6 +46,14 @@ if ! command -v fzf >/dev/null 2>&1; then
     echo "Install it from: https://github.com/junegunn/fzf" >&2
     exit 1
 fi
+
+require_curl() {
+    local provider_name="$1"
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "Error: curl is required for $provider_name model discovery." >&2
+        exit 1
+    fi
+}
 
 parse_models_from_json() {
     run_python -c '
@@ -77,10 +88,7 @@ for item in payload.get("data", []):
 }
 
 get_openrouter_models() {
-    if ! command -v curl >/dev/null 2>&1; then
-        echo "Error: curl is required for OpenRouter model discovery." >&2
-        exit 1
-    fi
+    require_curl "OpenRouter"
 
     local openrouter_key
     openrouter_key="${OPENROUTER_API_KEY:-$(read_env_value OPENROUTER_API_KEY)}"
@@ -102,10 +110,7 @@ get_openrouter_models() {
 }
 
 get_lmstudio_models() {
-    if ! command -v curl >/dev/null 2>&1; then
-        echo "Error: curl is required for LM Studio model discovery." >&2
-        exit 1
-    fi
+    require_curl "LM Studio"
 
     local lm_base
     lm_base="${LM_STUDIO_BASE_URL:-$(read_env_value LM_STUDIO_BASE_URL)}"
@@ -129,6 +134,12 @@ get_lmstudio_models() {
 }
 
 provider="${CLAUDE_PICK_PROVIDER:-$(read_env_value PROVIDER_TYPE)}"
+if [[ -z "$provider" ]]; then
+    configured_model="$(read_env_value MODEL)"
+    if [[ "$configured_model" == */* ]]; then
+        provider="${configured_model%%/*}"
+    fi
+fi
 provider="${provider:-nvidia_nim}"
 
 prompt="Select a model> "
@@ -145,6 +156,32 @@ case "$provider" in
         models="$(get_lmstudio_models)"
         prompt="Select an LM Studio model> "
         ;;
+    deepseek|deep_seek|deep-seek)
+        models="$DEEPSEEK_MODELS"
+        prompt="Select a DeepSeek model> "
+        ;;
+    ollama)
+        require_curl "Ollama"
+        ollama_base="${OLLAMA_BASE_URL:-$(read_env_value OLLAMA_BASE_URL)}"
+        ollama_base="${ollama_base:-$DEFAULT_OLLAMA_BASE_URL}"
+        if ! response="$(curl -fsSL "${ollama_base%/}/api/tags")"; then
+            echo "Error: Failed to query Ollama models at ${ollama_base%/}/api/tags" >&2
+            echo "Start Ollama first (for example: ollama serve)." >&2
+            exit 1
+        fi
+        models="$(run_python -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for item in payload.get("models", []):
+    name = item.get("name")
+    if name:
+        print(name)
+' <<< "$response")"
+        prompt="Select an Ollama model> "
+        ;;
     llamacpp|llama.cpp)
         # llama.cpp doesn't have a standardized /models endpoint that returns all loaded models reliably
         # in the same way, but it does support Anthropic routing. We can use a stub model or query if available.
@@ -154,7 +191,7 @@ case "$provider" in
         ;;
     *)
         echo "Error: Unsupported PROVIDER_TYPE='$provider'." >&2
-        echo "Expected one of: nvidia_nim, open_router, lmstudio, llamacpp" >&2
+        echo "Expected one of: nvidia_nim, open_router, deepseek, lmstudio, llamacpp, ollama" >&2
         exit 1
         ;;
 esac

@@ -53,6 +53,9 @@ def test_models_list(client: TestClient):
     data = response.json()
     assert data["has_more"] is False
     ids = [item["id"] for item in data["data"]]
+    assert "claude-opus-4-1-20250805" in ids
+    assert "claude-sonnet-4-5-20250929" in ids
+    assert "claude-haiku-4-5-20251001" in ids
     assert "claude-sonnet-4-20250514" in ids
     assert data["first_id"] == ids[0]
     assert data["last_id"] == ids[-1]

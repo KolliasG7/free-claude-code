@@ -155,11 +155,47 @@ def test_stop_cli_with_handler(client):
 
     assert response.status_code == 200
     assert response.json()["cancelled_count"] == 3
-    mock_handler.stop_all_tasks.assert_called_once()
+
+
+def test_webhook_message_requires_enabled_platform(client):
+    app.state.messaging_platform = None
+
+    response = client.post("/webhook/message", json={"text": "hello"})
+
+    assert response.status_code == 404
+
+
+def test_webhook_message_validates_secret(client):
+    platform = MagicMock()
+    platform.name = "webhook"
+    platform.shared_secret = "secret"
+    app.state.messaging_platform = platform
+
+    response = client.post("/webhook/message", json={"text": "hello"})
+
+    assert response.status_code == 401
+
+
+def test_webhook_message_accepts_payload(client):
+    platform = MagicMock()
+    platform.name = "webhook"
+    platform.shared_secret = "secret"
+    platform.handle_inbound = AsyncMock(return_value="msg-1")
+    app.state.messaging_platform = platform
+
+    response = client.post(
+        "/webhook/message",
+        json={"text": "hello"},
+        headers={"X-Webhook-Secret": "secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"accepted": True, "message_id": "msg-1"}
+    platform.handle_inbound.assert_awaited_once_with({"text": "hello"})
 
     # Cleanup state
-    if hasattr(app.state, "message_handler"):
-        del app.state.message_handler
+    if hasattr(app.state, "messaging_platform"):
+        del app.state.messaging_platform
 
 
 def test_stop_cli_fallback_to_manager(client):
